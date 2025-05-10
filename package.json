@@ -1,0 +1,26 @@
+{
+  "name": "howtocook-backend",
+  "version": "1.0.0",
+  "description": "Backend server for HowToCook app",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "sync": "node sync.js",
+    "test-db": "node test-db.js"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "github-webhook-handler": "^1.0.0",
+    "markdown-it": "^14.1.0",
+    "mongoose": "^8.14.2",
+    "nodemon": "^3.1.10"
+  }
+}
