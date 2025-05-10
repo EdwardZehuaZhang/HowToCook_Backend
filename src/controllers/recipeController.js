@@ -49,14 +49,10 @@ exports.searchRecipes = async (req, res) => {
     
     let searchQuery = {};
     
-    // Add text search if query is provided
+    // Add search if query is provided
     if (query) {
-      // Use both text search and regex for better results
-      searchQuery.$or = [
-        { $text: { $search: query } },
-        { name: { $regex: query, $options: 'i' } },
-        { materials: { $regex: query, $options: 'i' } }
-      ];
+      // Just use simple regex search - no need for complex $or with text search
+      searchQuery.name = { $regex: query, $options: 'i' };
     }
     
     // Add category filter if provided
@@ -69,8 +65,7 @@ exports.searchRecipes = async (req, res) => {
     const recipes = await Recipe.find(searchQuery)
       .select('name category difficulty description imageUrl')
       .skip(skip)
-      .limit(limit)
-      .sort({ score: { $meta: 'textScore' } });
+      .limit(limit);
     
     const total = await Recipe.countDocuments(searchQuery);
     

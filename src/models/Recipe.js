@@ -52,5 +52,8 @@ RecipeSchema.index({
   materials: 'text' 
 });
 
+RecipeSchema.index({ name: 1 });
+RecipeSchema.index({ materials: 1 });
+
 const Recipe = mongoose.model('Recipe', RecipeSchema);
 module.exports = Recipe;

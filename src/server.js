@@ -11,7 +11,11 @@ connectDB();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:9003','http://localhost:9002', 'http://localhost:9001', 'http://localhost:3000','http://localhost:3001','http://localhost:3002'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Routes
