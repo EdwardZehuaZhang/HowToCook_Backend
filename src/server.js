@@ -19,22 +19,28 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
-app.use('/api', recipeRoutes);
+app.use('/api/recipes', recipeRoutes);
+app.use('/api/search', searchRoutes);
+
 
 // Sync route - manually trigger a sync with the GitHub repo
 app.get('/sync', async (req, res) => {
   try {
     // Start sync process
     syncRepository();
-    res.json({ message: 'Sync process started' });
+    res.json({ message: 'Sync process started' });F
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// Home route
+app.get('/api-status', (req, res) => {
+  res.json({ status: 'ok', message: 'API is running' });
+});
+
+// Root endpoint for testing
 app.get('/', (req, res) => {
-  res.send('HowToCook API Server is running');
+  res.send('HowToCook Backend is running. Access API endpoints at /api/...');
 });
 
 // Set up port
