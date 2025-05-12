@@ -26,17 +26,52 @@ async function parseRecipeMarkdown(filePath) {
       : '其他';
 
     // Extract difficulty (look for stars)
-    const difficultyRegex = /难度[：:]\s*(\d+)\s*星/;
+    const difficultyRegex = /预估烹饪难度：(★+)/;
     const difficultyMatch = content.match(difficultyRegex);
-    const difficulty = difficultyMatch ? parseInt(difficultyMatch[1]) : 1;
+    const difficulty = difficultyMatch ? difficultyMatch[1].length : null; // Use null for NA
+
+    const imageUrls = extractImageUrls(content, filePath);
 
     // Extract description (usually the first paragraph after the title)
     let description = '';
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i].trim() && !lines[i].startsWith('#')) {
-        description = lines[i].trim();
+    
+    let startIdx = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('的做法') || lines[i].trim().startsWith('# ')) {
+        startIdx = i + 1;
         break;
       }
+    }
+
+    // Find end index (difficulty line or next heading)
+    let endIdx = lines.length;
+    for (let i = startIdx; i < lines.length; i++) {
+      if (
+        lines[i].includes('预估烹饪难度') || 
+        lines[i].includes('必备原料和工具') ||
+        lines[i].trim().startsWith('#')
+      ) {
+        endIdx = i;
+        break;
+      }
+    }
+
+    // Extract all description paragraphs
+    if (startIdx >= 0 && startIdx < endIdx) {
+      const descriptionParagraphs = [];
+      for (let i = startIdx; i < endIdx; i++) {
+        const line = lines[i].trim();
+        // Skip empty lines and image markdown lines
+        if (line !== '' && !line.match(/^!\[.*?\]\(.*?\)/)) {
+          descriptionParagraphs.push(line);
+        }
+      }
+      description = descriptionParagraphs.join('\n\n');
+    }
+
+    // If no description found, set to null
+    if (!description) {
+      description = null;
     }
 
     // Extract materials, calculations, procedure, and extra info
@@ -51,8 +86,7 @@ async function parseRecipeMarkdown(filePath) {
       ? filePath.substring(filePath.indexOf('dishes')) 
       : filePath;
     const sourceUrl = `${repoBase}${relPath.replace(/\\/g, '/')}`;
-    const imageUrl = extractImageUrl(content);
-
+    const imageUrl = imageUrls.length > 0 ? imageUrls[0] : "";
 
     return {
       name,
@@ -63,7 +97,8 @@ async function parseRecipeMarkdown(filePath) {
       calculations,
       procedure,
       extraInfo,
-      imageUrl: imageUrl,  // Use the extracted URL
+      imageUrl: imageUrls.length > 0 ? imageUrls[0] : "",
+      allImageUrls: imageUrls,
       sourceUrl,
       lastUpdated: new Date()
     };
@@ -94,26 +129,48 @@ function extractSection(content, sectionName) {
 /**
  * Extract image URLs from markdown content
  * @param {string} content Markdown content
- * @returns {string} First image URL found or empty string
+ * @param {string} filePath Path to the markdown file
+ * @returns {Array} Array of image URLs
  */
-function extractImageUrl(content) {
-  const imageRegex = /!\[.*?\]\((.*?)\)/;
-  const match = content.match(imageRegex);
+function extractImageUrls(content, filePath) {
+  // Find all image references using global regex
+  const imageRegex = /!\[.*?\]\((.*?)\)/g;
+  const matches = [...content.matchAll(imageRegex)];
   
-  if (match && match[1]) {
-    let imageUrl = match[1];
-    
-    // Handle relative paths vs absolute URLs
-    if (imageUrl.startsWith('http')) {
-      return imageUrl;
-    } else if (imageUrl.startsWith('./')) {
-      // For relative paths, we can't resolve them easily
-      // so we'll use a placeholder for now
-      return "";
-    }
+  // No images found
+  if (!matches || matches.length === 0) {
+    return [];
   }
   
-  return "";
+  // Get GitHub repo base path for the file
+  const repoBase = 'https://github.com/Anduin2017/HowToCook/blob/master/';
+  const relPath = filePath.includes('dishes') 
+    ? filePath.substring(filePath.indexOf('dishes')) 
+    : filePath;
+  const dirPath = relPath.replace(/\\/g, '/').replace(/\/[^\/]+$/, '/');
+  
+  // Process each image URL
+  return matches.map(match => {
+    const imageRelPath = match[1];
+    
+    // Skip external URLs
+    if (imageRelPath.startsWith('http')) {
+      return imageRelPath;
+    }
+    
+    // Convert relative paths to GitHub URLs
+    if (imageRelPath.startsWith('./')) {
+      // Remove "./" prefix for combining with dirPath
+      const cleanPath = imageRelPath.substring(2);
+      return `${repoBase}${dirPath}${cleanPath}`;
+    } else if (imageRelPath.startsWith('/')) {
+      // Absolute path from repo root
+      return `${repoBase}${imageRelPath.substring(1)}`;
+    } else {
+      // Path without "./" prefix
+      return `${repoBase}${dirPath}${imageRelPath}`;
+    }
+  }).filter(url => url.length > 0);
 }
 
 

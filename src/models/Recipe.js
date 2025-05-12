@@ -13,11 +13,11 @@ const RecipeSchema = new mongoose.Schema({
   },
   difficulty: {
     type: Number,
-    default: 1
+    default: null  
   },
   description: {
-    type: String,
-    required: true
+  type: String,
+  default: null  
   },
   materials: [{
     type: String
@@ -34,6 +34,10 @@ const RecipeSchema = new mongoose.Schema({
   imageUrl: {
     type: String,
     default: ""
+  },
+  allImageUrls: {
+  type: [String],
+  default: []
   },
   sourceUrl: {
     type: String,

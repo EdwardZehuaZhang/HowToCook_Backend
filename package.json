@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "sync": "node sync.js",
     "dev": "nodemon src/server.js",
     "sync": "node sync.js",
     "test-db": "node test-db.js"
