@@ -70,11 +70,11 @@ async function parseRecipeMarkdown(filePath) {
     const procedure = extractSection(content, '操作');
     const extraInfo = extractSection(content, '附加内容');
 
-    const repoBase = 'https://media.githubusercontent.com/media/Anduin2017/HowToCook/master/';
+    const githubBase = 'https://github.com/Anduin2017/HowToCook/blob/master/';
     const relPath = filePath.includes('dishes') 
       ? filePath.substring(filePath.indexOf('dishes')) 
       : filePath;
-    const sourceUrl = `${repoBase}${relPath.replace(/\\/g, '/')}`;
+    const sourceUrl = `${githubBase}${relPath.replace(/\\/g, '/')}`;
     const imageUrl = imageUrls.length > 0 ? imageUrls[0] : "";
 
     return {
@@ -127,7 +127,9 @@ function extractImageUrls(content, filePath) {
     return [];
   }
   
-  const repoBase = 'https://github.com/Anduin2017/HowToCook/blob/master/';
+  const githubBase = 'https://github.com/Anduin2017/HowToCook/blob/master/';
+  const mediaBase = 'https://media.githubusercontent.com/media/Anduin2017/HowToCook/master/';
+  
   const relPath = filePath.includes('dishes') 
     ? filePath.substring(filePath.indexOf('dishes')) 
     : filePath;
@@ -140,14 +142,20 @@ function extractImageUrls(content, filePath) {
       return imageRelPath;
     }
     
+    let fullPath = '';
     if (imageRelPath.startsWith('./')) {
+      // Handle relative path with ./
       const cleanPath = imageRelPath.substring(2);
-      return `${repoBase}${dirPath}${cleanPath}`;
+      fullPath = `${dirPath}${cleanPath}`;
     } else if (imageRelPath.startsWith('/')) {
-      return `${repoBase}${imageRelPath.substring(1)}`;
+      // Handle absolute path from repo root
+      fullPath = imageRelPath.substring(1);
     } else {
-      return `${repoBase}${dirPath}${imageRelPath}`;
+      // Handle relative path without ./
+      fullPath = `${dirPath}${imageRelPath}`;
     }
+    
+    return `${mediaBase}${fullPath}`;
   }).filter(url => url.length > 0);
 }
 

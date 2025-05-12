@@ -26,11 +26,23 @@ async function main() {
         .catch(() => false);
       
       if (repoStat.isDirectory() && gitDirExists) {
-        console.log('Repository exists, pulling latest changes...');
-        // Change to the repository directory and pull changes
+        console.log('Repository exists, resetting any local changes and pulling latest...');
+        // Change to the repository directory and reset + pull changes
         const currentDir = process.cwd();
         process.chdir(repoDir);
-        await exec('git pull');
+        
+        try {
+          // Force reset any local changes
+          await exec('git reset --hard HEAD');
+          // Clean untracked files
+          await exec('git clean -fd');
+          // Now pull latest changes
+          await exec('git pull');
+        } catch (gitError) {
+          console.error('Error during git operations:', gitError);
+          throw gitError;
+        }
+        
         process.chdir(currentDir);
       } else {
         // Delete directory if it exists but isn't a git repository
