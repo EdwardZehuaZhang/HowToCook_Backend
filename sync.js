@@ -7,39 +7,60 @@ const exec = util.promisify(require('child_process').exec);
 const { parseRecipeMarkdown } = require('./src/utils/markdownParser');
 const Recipe = require('./src/models/Recipe');
 
-// Repository directory
-const repoDir = path.resolve(__dirname, './HowToCook_Repo');
-
 async function main() {
   try {
     console.log('Connecting to MongoDB...');
     await mongoose.connect(process.env.MONGO_URI);
     console.log('Connected to MongoDB!');
     
+    // Repository directory
+    const repoDir = path.join(__dirname, 'HowToCook_Repo');
+
     console.log('Starting repository sync...');
     
-    // Check if repo exists
+    // Check if repository exists
     try {
-      await fs.access(repoDir);
-      console.log('Repository exists, pulling latest changes...');
-      await exec(`cd "${repoDir}" && git pull`);
+      const repoStat = await fs.stat(repoDir);
+      const gitDirExists = await fs.stat(path.join(repoDir, '.git'))
+        .then(() => true)
+        .catch(() => false);
+      
+      if (repoStat.isDirectory() && gitDirExists) {
+        console.log('Repository exists, pulling latest changes...');
+        // Change to the repository directory and pull changes
+        const currentDir = process.cwd();
+        process.chdir(repoDir);
+        await exec('git pull');
+        process.chdir(currentDir);
+      } else {
+        // Delete directory if it exists but isn't a git repository
+        if (repoStat.isDirectory()) {
+          console.log('Directory exists but not a git repo. Removing...');
+          await fs.rm(repoDir, { recursive: true, force: true });
+        }
+        
+        console.log('Repository does not exist, cloning...');
+        await exec(`git clone "https://github.com/Anduin2017/HowToCook.git" "${repoDir}"`);
+      }
     } catch (error) {
-      console.log('Repository does not exist, cloning...');
-      await exec(`git clone "https://github.com/Anduin2017/HowToCook.git" "${repoDir}"`);
+      if (error.code === 'ENOENT') {
+        // Directory doesn't exist at all
+        console.log('Repository does not exist, cloning...');
+        await exec(`git clone "https://github.com/Anduin2017/HowToCook.git" "${repoDir}"`);
+      } else {
+        throw error;
+      }
     }
     
-    console.log('Processing recipes...');
+    // Process the recipe files
+    console.log('Processing recipe files...');
     const dishesDir = path.join(repoDir, 'dishes');
     await processDirectory(dishesDir);
     
-    console.log('All done! Closing connection...');
-    await mongoose.connection.close();
+    console.log('Repository sync completed!');
     process.exit(0);
   } catch (error) {
     console.error('Error:', error);
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
     process.exit(1);
   }
 }
@@ -81,8 +102,11 @@ async function processMarkdownFile(filePath) {
       console.log(`Added new recipe: ${recipeData.name}`);
     }
   } catch (error) {
-    console.error(`Error processing file ${filePath}:`, error.message);
+    console.error(`Error processing file ${filePath}:`, error);
   }
 }
 
-main();
+main().catch(err => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});
