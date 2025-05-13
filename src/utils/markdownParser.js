@@ -14,7 +14,10 @@ async function parseRecipeMarkdown(filePath) {
 
     const nameRegex = /^# (.+)/;
     const nameMatch = content.match(nameRegex);
-    const name = nameMatch ? nameMatch[1] : path.basename(filePath, '.md');
+    let name = nameMatch ? nameMatch[1] : path.basename(filePath, '.md');
+    
+    // Remove "的做法" from the recipe name if present
+    name = name.replace(/的做法$/, '');
 
     const pathParts = filePath.split(path.sep);
     const categoryIndex = pathParts.indexOf('dishes');
