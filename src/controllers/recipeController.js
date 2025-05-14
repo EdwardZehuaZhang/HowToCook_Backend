@@ -41,18 +41,24 @@ exports.getRecipeById = async (req, res) => {
 };
 
 exports.searchRecipes = async (req, res) => {
+  console.log('🔍 Search endpoint hit with request:', req.url);
+  console.log('🔍 Search query params:', req.query);
+  
   try {
     const { query, category } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
+    console.log(`🔍 Processing search: query="${query}", category="${category}", page=${page}, limit=${limit}`);
+    
     let searchQuery = {};
     
     // Add search if query is provided
     if (query) {
-      // Just use simple regex search - no need for complex $or with text search
+      // ONLY search in name field with case-insensitive regex
       searchQuery.name = { $regex: query, $options: 'i' };
+      console.log(`🔍 Search query for '${query}' using:`, JSON.stringify(searchQuery));
     }
     
     // Add category filter if provided
@@ -60,14 +66,25 @@ exports.searchRecipes = async (req, res) => {
       searchQuery.category = category;
     }
 
-    console.log('Search query:', JSON.stringify(searchQuery));
+    console.log('🔍 Full search query:', JSON.stringify(searchQuery));
     
+    // Execute the search
+    console.log('🔍 Executing MongoDB find with query...');
     const recipes = await Recipe.find(searchQuery)
       .select('name category difficulty description imageUrl')
       .skip(skip)
       .limit(limit);
     
+    console.log(`✅ Search complete: Found ${recipes.length} results for '${query}'`);
+    if (recipes.length > 0) {
+      console.log('✅ Recipe names found:', recipes.map(r => r.name).join(', '));
+    } else {
+      console.log('❌ No recipes found');
+    }
+    
     const total = await Recipe.countDocuments(searchQuery);
+    
+    console.log(`🔍 Returning ${recipes.length} results, total: ${total}`);
     
     res.json({
       page,
@@ -76,8 +93,10 @@ exports.searchRecipes = async (req, res) => {
       totalPages: Math.ceil(total / limit),
       data: recipes
     });
+    console.log('✅ Response sent successfully');
   } catch (error) {
-    console.error('Search error:', error);
+    console.error('❌ Search error:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ message: error.message });
   }
 };
