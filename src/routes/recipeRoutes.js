@@ -41,14 +41,24 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     console.log(`Looking up recipe with ID: ${req.params.id}`);
-    const recipe = await Recipe.findById(req.params.id);
+    // Explicitly select all fields to ensure nested arrays are included
+    const recipe = await Recipe.findById(req.params.id).lean();
     
     if (!recipe) {
       console.log(`Recipe with ID ${req.params.id} not found`);
       return res.status(404).json({ message: 'Recipe not found' });
     }
     
-    return res.json(recipe);
+    // Use the normalizeRecipe method to ensure consistent structure
+    const normalizedRecipe = Recipe.normalizeRecipe(recipe);
+    
+    console.log('Recipe found, checking arrays:', {
+      hasMaterials: Array.isArray(normalizedRecipe.materials) && normalizedRecipe.materials.length,
+      hasProcedure: Array.isArray(normalizedRecipe.procedure) && normalizedRecipe.procedure.length,
+      materialsSample: normalizedRecipe.materials?.slice(0, 2)
+    });
+    
+    return res.json(normalizedRecipe);
   } catch (error) {
     console.error(`Error fetching recipe ${req.params.id}:`, error);
     return res.status(500).json({ message: 'Server error' });

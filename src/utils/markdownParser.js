@@ -106,15 +106,57 @@ async function parseRecipeMarkdown(filePath) {
  * @returns {Array} 
  */
 function extractSection(content, sectionName) {
+  console.log(`Extracting section: ${sectionName}`);
+  
   const sectionRegex = new RegExp(`## ${sectionName}([\\s\\S]*?)(?=## |$)`, 'i');
   const match = content.match(sectionRegex);
   
-  if (!match) return [];
+  if (!match) {
+    console.log(`Section '${sectionName}' not found in content`);
+    return [];
+  }
   
-  return match[1]
+  console.log(`Found section '${sectionName}', raw content length: ${match[1].length}`);
+  
+  const lines = match[1]
     .split('\n')
     .map(line => line.trim())
     .filter(line => line.length > 0);
+  
+  console.log(`Section '${sectionName}' has ${lines.length} non-empty lines`);
+  
+  // Enhanced version: Detect and preserve hierarchy
+  const hierarchicalLines = [];
+  const bulletRegex = /^(\s*)[-*+]\s(.+)$/; // Matches bullet points with any indentation
+  
+  for (const line of lines) {
+    const bulletMatch = line.match(bulletRegex);
+    
+    if (bulletMatch) {
+      // This is a bullet point, calculate its level based on indentation
+      const indentation = bulletMatch[1];
+      const level = Math.floor(indentation.length / 2) + 1; // Each 2 spaces = one level
+      const text = bulletMatch[2];
+      
+      hierarchicalLines.push({
+        text: `- ${text}`, // Preserve the bullet format in text
+        level: level
+      });
+    } else {
+      // This is a regular line (not a bullet point)
+      hierarchicalLines.push({
+        text: line,
+        level: 0 // Base level
+      });
+    }
+  }
+  
+  console.log(`Extracted ${sectionName} with ${hierarchicalLines.length} hierarchical items`);
+  if (hierarchicalLines.length > 0) {
+    console.log(`First item sample: ${JSON.stringify(hierarchicalLines[0])}`);
+  }
+  
+  return hierarchicalLines;
 }
 
 /**
@@ -162,8 +204,7 @@ function extractImageUrls(content, filePath) {
   }).filter(url => url.length > 0);
 }
 
-
-
 module.exports = {
-  parseRecipeMarkdown
+  parseRecipeMarkdown,
+  extractSection // Export this for testing
 };

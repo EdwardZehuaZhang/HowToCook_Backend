@@ -8,7 +8,6 @@ exports.getAllRecipes = async (req, res) => {
     const skip = (page - 1) * limit;
     
     const recipes = await Recipe.find({})
-      .select('name category difficulty description imageUrl')
       .skip(skip)
       .limit(limit)
       .sort({ name: 1 });
@@ -34,7 +33,9 @@ exports.getRecipeById = async (req, res) => {
     if (!recipe) {
       return res.status(404).json({ message: 'Recipe not found' });
     }
-    res.json(recipe);
+    // Use normalizeRecipe to ensure all fields exist
+    const normalizedRecipe = Recipe.normalizeRecipe(recipe);
+    res.json(normalizedRecipe);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -71,7 +72,6 @@ exports.searchRecipes = async (req, res) => {
     // Execute the search
     console.log('🔍 Executing MongoDB find with query...');
     const recipes = await Recipe.find(searchQuery)
-      .select('name category difficulty description imageUrl')
       .skip(skip)
       .limit(limit);
     
