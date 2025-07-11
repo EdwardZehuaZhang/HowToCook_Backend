@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Recipe = require('../models/Recipe'); // Adjust path if your model is located elsewhere
+const { generateRecipe, parseGeneratedRecipe } = require('../services/aiService');
 
 /**
  * @route GET /api/recipes
@@ -62,6 +63,56 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error(`Error fetching recipe ${req.params.id}:`, error);
     return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * @route POST /api/recipes/generate
+ * @desc Generate a recipe using AI based on user selections
+ * @access Public
+ */
+router.post('/generate', async (req, res) => {
+  try {
+    const { selections } = req.body;
+    
+    // Validate input
+    if (!selections) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Missing selections data' 
+      });
+    }
+
+    console.log('Generating recipe for selections:', selections);
+
+    // Generate recipe using AI
+    const rawMarkdown = await generateRecipe(selections);
+    
+    // Parse the generated markdown into structured data
+    const parsedRecipe = parseGeneratedRecipe(rawMarkdown);
+    
+    // Optionally save to database (commented out for now)
+    // const savedRecipe = new Recipe(parsedRecipe);
+    // await savedRecipe.save();
+    
+    console.log('Recipe generated successfully:', parsedRecipe.name);
+    
+    return res.json({
+      success: true,
+      data: {
+        recipe: parsedRecipe,
+        rawMarkdown: rawMarkdown
+      }
+    });
+    
+  } catch (error) {
+    console.error('Recipe generation error:', error);
+    
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate recipe',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
