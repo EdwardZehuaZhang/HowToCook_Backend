@@ -1,11 +1,85 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const fetch = require('node-fetch');
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+/**
+ * Search for similar recipes online using DuckDuckGo
+ * @param {Object} selections - User's ingredient and equipment selections
+ * @returns {Promise<string>} Search results summary
+ */
+async function searchSimilarRecipes(selections) {
+  try {
+    // Create search query based on ingredients
+    const ingredients = [
+      ...(selections.vegetables || []),
+      ...(selections.meats || []),
+      ...(selections.staples || [])
+    ].slice(0, 3); // Limit to 3 main ingredients for better search results
+
+    if (ingredients.length === 0) {
+      return '无相关搜索结果';
+    }
+
+    const searchQuery = `${ingredients.join(' ')} 菜谱 做法 中式`;
+    console.log('Searching for similar recipes with query:', searchQuery);
+
+    // Use DuckDuckGo instant answer API (no API key required)
+    const searchUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(searchQuery)}&format=json&no_html=1&skip_disambig=1`;
+    
+    const response = await fetch(searchUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      },
+      timeout: 5000 // 5 second timeout
+    });
+
+    if (!response.ok) {
+      throw new Error('Search request failed');
+    }
+
+    const data = await response.json();
+    
+    // Extract relevant information from search results
+    let searchSummary = '';
+    
+    if (data.Abstract && data.Abstract.length > 0) {
+      searchSummary += `摘要信息: ${data.Abstract}\n`;
+    }
+    
+    if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+      searchSummary += '相关话题:\n';
+      data.RelatedTopics.slice(0, 3).forEach((topic, index) => {
+        if (topic.Text) {
+          searchSummary += `${index + 1}. ${topic.Text.substring(0, 150)}...\n`;
+        }
+      });
+    }
+
+    if (data.Results && data.Results.length > 0) {
+      searchSummary += '搜索结果:\n';
+      data.Results.slice(0, 2).forEach((result, index) => {
+        searchSummary += `${index + 1}. ${result.Text || result.FirstURL}\n`;
+      });
+    }
+
+    console.log('Search completed, found relevant information');
+    return searchSummary || '找到了一些相关的烹饪信息，可以作为参考';
+    
+  } catch (error) {
+    console.warn('Web search failed, continuing without search results:', error.message);
+    return '无法获取在线参考信息，将基于现有知识生成菜谱';
+  }
+}
+
 const RECIPE_PROMPT_TEMPLATE = `
-你是一位专业的中式料理专家。请根据用户提供的食材和厨具，生成一份严格按照以下markdown格式的中式菜谱：
+你是一位专业的中式料理专家。请根据用户提供的食材和厨具，参考以下在线搜索到的相关信息，生成一份严格按照以下markdown格式的中式菜谱：
+
+在线参考信息：
+{searchResults}
 
 严格格式要求（必须完全按照此格式）：
 # [菜名]
@@ -46,14 +120,14 @@ const RECIPE_PROMPT_TEMPLATE = `
 2. 适配用户选择的厨具
 3. 如果是"严格匹配"模式，只能使用用户选择的食材
 4. 如果是"模糊匹配"模式，可以添加1-2种常见调料
-5. 如果是"生存模式"，尽量简化步骤和调料
-6. 菜名要有创意且符合中式菜谱命名习惯
-7. 步骤要详细实用，适合家庭制作
+5. 菜名要有创意且符合中式菜谱命名习惯
+6. 步骤要详细实用，适合家庭制作
+7. 参考在线信息但要确保使用用户选择的食材
 8. 必须严格按照上述markdown格式输出，不要有任何格式偏差
 `;
 
 /**
- * Generate recipe using Google Gemini AI
+ * Generate recipe using Google Gemini AI with web search enhancement
  * @param {Object} selections - User's ingredient and equipment selections
  * @returns {Promise<string>} Generated recipe in markdown format
  */
@@ -64,8 +138,16 @@ async function generateRecipe(selections) {
       throw new Error('GOOGLE_API_KEY environment variable is not set');
     }
 
-    // Prepare the prompt with user selections
+    console.log('Starting recipe generation with web search...');
+    console.log('User selections:', selections);
+
+    // First, search for similar recipes online
+    const searchResults = await searchSimilarRecipes(selections);
+    console.log('Web search completed');
+
+    // Prepare the prompt with user selections and search results
     const prompt = RECIPE_PROMPT_TEMPLATE
+      .replace('{searchResults}', searchResults)
       .replace('{vegetables}', selections.vegetables?.join(', ') || '无')
       .replace('{meats}', selections.meats?.join(', ') || '无')
       .replace('{staples}', selections.staples?.join(', ') || '无')
@@ -73,14 +155,13 @@ async function generateRecipe(selections) {
       .replace('{mode}', selections.mode?.join(', ') || '模糊匹配');
 
     console.log('Generating recipe with Gemini AI...');
-    console.log('User selections:', selections);
 
-    // Generate content using Gemini
+    // Generate content using Gemini with search-enhanced prompt
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const generatedText = response.text();
 
-    console.log('Recipe generated successfully');
+    console.log('Recipe generated successfully with web search enhancement');
     
     return generatedText;
   } catch (error) {
