@@ -1,23 +1,20 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fetch = require('node-fetch');
 
-// Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 /**
- * Search for similar recipes online using DuckDuckGo
  * @param {Object} selections - User's ingredient and equipment selections
  * @returns {Promise<string>} Search results summary
  */
 async function searchSimilarRecipes(selections) {
   try {
-    // Create search query based on ingredients
     const ingredients = [
       ...(selections.vegetables || []),
       ...(selections.meats || []),
       ...(selections.staples || [])
-    ].slice(0, 3); // Limit to 3 main ingredients for better search results
+    ].slice(0, 3); 
 
     if (ingredients.length === 0) {
       return '无相关搜索结果';
@@ -26,7 +23,6 @@ async function searchSimilarRecipes(selections) {
     const searchQuery = `${ingredients.join(' ')} 菜谱 做法 中式`;
     console.log('Searching for similar recipes with query:', searchQuery);
 
-    // Use DuckDuckGo instant answer API (no API key required)
     const searchUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(searchQuery)}&format=json&no_html=1&skip_disambig=1`;
     
     const response = await fetch(searchUrl, {
@@ -34,7 +30,7 @@ async function searchSimilarRecipes(selections) {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       },
-      timeout: 5000 // 5 second timeout
+      timeout: 5000 
     });
 
     if (!response.ok) {
@@ -43,7 +39,6 @@ async function searchSimilarRecipes(selections) {
 
     const data = await response.json();
     
-    // Extract relevant information from search results
     let searchSummary = '';
     
     if (data.Abstract && data.Abstract.length > 0) {
@@ -127,13 +122,11 @@ const RECIPE_PROMPT_TEMPLATE = `
 `;
 
 /**
- * Generate recipe using Google Gemini AI with web search enhancement
  * @param {Object} selections - User's ingredient and equipment selections
  * @returns {Promise<string>} Generated recipe in markdown format
  */
 async function generateRecipe(selections) {
   try {
-    // Validate API key
     if (!process.env.GOOGLE_API_KEY) {
       throw new Error('GOOGLE_API_KEY environment variable is not set');
     }
@@ -141,11 +134,9 @@ async function generateRecipe(selections) {
     console.log('Starting recipe generation with web search...');
     console.log('User selections:', selections);
 
-    // First, search for similar recipes online
     const searchResults = await searchSimilarRecipes(selections);
     console.log('Web search completed');
 
-    // Prepare the prompt with user selections and search results
     const prompt = RECIPE_PROMPT_TEMPLATE
       .replace('{searchResults}', searchResults)
       .replace('{vegetables}', selections.vegetables?.join(', ') || '无')
@@ -156,7 +147,6 @@ async function generateRecipe(selections) {
 
     console.log('Generating recipe with Gemini AI...');
 
-    // Generate content using Gemini with search-enhanced prompt
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const generatedText = response.text();
@@ -167,7 +157,6 @@ async function generateRecipe(selections) {
   } catch (error) {
     console.error('AI Generation Error:', error);
     
-    // Provide specific error messages
     if (error.message?.includes('API_KEY')) {
       throw new Error('Invalid Google API key. Please check your GOOGLE_API_KEY environment variable.');
     } else if (error.message?.includes('quota')) {
@@ -181,7 +170,6 @@ async function generateRecipe(selections) {
 }
 
 /**
- * Parse generated markdown to extract structured recipe data
  * @param {string} markdown - Generated markdown content
  * @returns {Object} Parsed recipe object
  */
@@ -232,14 +220,12 @@ function parseGeneratedRecipe(markdown) {
           }
         }
       } else if (trimmedLine && !trimmedLine.startsWith('#') && !trimmedLine.startsWith('!') && !currentSection && !description) {
-        // This might be the description
         if (trimmedLine.length > 10 && !trimmedLine.includes('预估烹饪难度')) {
           description = trimmedLine;
         }
       }
     });
     
-    // Fallback values
     if (!recipeName) recipeName = 'AI生成菜谱';
     if (!description) description = '由AI生成的美味菜谱';
     if (materials.length === 0) materials.push({ text: '请参考原料清单', level: 0 });
@@ -261,7 +247,6 @@ function parseGeneratedRecipe(markdown) {
   } catch (error) {
     console.error('Error parsing generated recipe:', error);
     
-    // Return a fallback recipe structure
     return {
       name: 'AI生成菜谱',
       description: '解析失败，请重新生成',

@@ -26,9 +26,48 @@ app.use((req, res, next) => {
   next();
 });
 
+// CORS configuration for both development and production
+const allowedOrigins = [
+  // Local development URLs
+  'http://localhost:9003',
+  'http://localhost:9002', 
+  'http://localhost:9001', 
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  // Production Vercel URLs
+  'https://howtocook-frontend-git-master-edwardzehuazhangs-projects.vercel.app',
+  'https://howtocook-frontend-edwardzehuazhangs-projects.vercel.app',
+  // Allow any *.vercel.app domain for this project
+  /^https:\/\/.*-edwardzehuazhangs-projects\.vercel\.app$/,
+  // Allow main domain if you have a custom domain
+  'https://howtocook-app.vercel.app'
+];
+
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:9003','http://localhost:9002', 'http://localhost:9001', 'http://localhost:3000','http://localhost:3001','http://localhost:3002'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list or matches regex pattern
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      console.log(`✅ CORS: Allowed origin: ${origin}`);
+      return callback(null, true);
+    } else {
+      console.log(`❌ CORS: Blocked origin: ${origin}`);
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
